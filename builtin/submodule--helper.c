@@ -2787,7 +2787,7 @@ static int absorb_git_dirs(int argc, const char **argv, const char *prefix)
 	};
 
 	const char *const git_submodule_helper_usage[] = {
-		N_("git submodule--helper absorb-git-dirs [<options>] [<path>...]"),
+		N_("git submodule--helper absorbgitdirs [<options>] [<path>...]"),
 		NULL
 	};
 
@@ -3386,7 +3386,7 @@ static struct cmd_struct commands[] = {
 	{"deinit", module_deinit},
 	{"summary", module_summary},
 	{"push-check", push_check},
-	{"absorb-git-dirs", absorb_git_dirs},
+	{"absorbgitdirs", absorb_git_dirs},
 	{"is-active", is_active},
 	{"check-name", check_name},
 	{"config", module_config},
