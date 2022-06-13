@@ -608,6 +608,8 @@ struct rpc_state {
 	unsigned flush_read_but_not_sent : 1;
 };
 
+#define RPC_STATE_INIT { 0 }
+
 /*
  * Appends the result of reading from rpc->out to the string represented by
  * rpc->buf and rpc->len if there is enough space. Returns 1 if there was
@@ -1161,7 +1163,7 @@ static int fetch_dumb(int nr_heads, struct ref **to_fetch)
 static int fetch_git(struct discovery *heads,
 	int nr_heads, struct ref **to_fetch)
 {
-	struct rpc_state rpc;
+	struct rpc_state rpc = RPC_STATE_INIT;
 	struct strbuf preamble = STRBUF_INIT;
 	int i, err;
 	struct strvec args = STRVEC_INIT;
@@ -1307,7 +1309,7 @@ static int push_dav(int nr_spec, const char **specs)
 
 static int push_git(struct discovery *heads, int nr_spec, const char **specs)
 {
-	struct rpc_state rpc;
+	struct rpc_state rpc = RPC_STATE_INIT;
 	int i, err;
 	struct strvec args;
 	struct string_list_item *cas_option;
@@ -1406,7 +1408,7 @@ free_specs:
 static int stateless_connect(const char *service_name)
 {
 	struct discovery *discover;
-	struct rpc_state rpc;
+	struct rpc_state rpc = RPC_STATE_INIT;
 	struct strbuf buf = STRBUF_INIT;
 	const char *accept_language;
 
