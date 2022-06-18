@@ -116,15 +116,12 @@ static void mktree_line(char *buf, int nul_term_line, int allow_missing)
 			path, ptr, type_name(mode_type));
 	}
 
-	/* Check the type of object identified by sha1 */
-	obj_type = oid_object_info(the_repository, &oid, NULL);
-	if (obj_type < 0) {
-		if (allow_missing) {
-			; /* no problem - missing objects are presumed to be of the right type */
-		} else {
+	if (!allow_missing) {
+		/* Check the type of object identified by sha1 */
+		obj_type = oid_object_info(the_repository, &oid, NULL);
+		if (obj_type < 0) {
 			die("entry '%s' object %s is unavailable", path, oid_to_hex(&oid));
 		}
-	} else {
 		if (obj_type != mode_type) {
 			/*
 			 * The object exists but is of the wrong type.
