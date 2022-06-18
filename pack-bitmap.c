@@ -312,27 +312,29 @@ char *pack_bitmap_filename(struct packed_git *p)
 static int open_midx_bitmap_1(struct bitmap_index *bitmap_git,
 			      struct multi_pack_index *midx)
 {
+	int fd;
 	struct stat st;
-	char *idx_name = midx_bitmap_filename(midx);
-	int fd = git_open(idx_name);
+	char *bitmap_name = midx_bitmap_filename(midx);
 	uint32_t i;
 	struct packed_git *preferred;
 
-	free(idx_name);
+	trace2_data_string("midx", the_repository, "path", bitmap_name);
+	fd = git_open(bitmap_name);
+	free(bitmap_name);
 
 	if (fd < 0)
 		return -1;
 
 	if (fstat(fd, &st)) {
 		close(fd);
-		return -1;
+		return error(_("cannot stat bitmap file"));
 	}
 
 	if (bitmap_git->pack || bitmap_git->midx) {
 		struct strbuf buf = STRBUF_INIT;
 		get_midx_filename(&buf, midx->object_dir);
 		/* ignore extra bitmap file; we can only handle one */
-		warning("ignoring extra bitmap file: %s", buf.buf);
+		warning(_("ignoring extra bitmap file: %s"), buf.buf);
 		close(fd);
 		strbuf_release(&buf);
 		return -1;
@@ -345,11 +347,18 @@ static int open_midx_bitmap_1(struct bitmap_index *bitmap_git,
 				MAP_PRIVATE, fd, 0);
 	close(fd);
 
-	if (load_bitmap_header(bitmap_git) < 0)
+	if (load_bitmap_header(bitmap_git) < 0) {
+		trace2_data_string("midx", the_repository, "load bitmap header",
+				   "failed");
+		goto cleanup;
+	}
+
+	if (!hasheq(get_midx_checksum(bitmap_git->midx), bitmap_git->checksum)) {
+		trace2_data_string("midx", the_repository, "verify checksum",
+				   "mismatch");
 		goto cleanup;
 
-	if (!hasheq(get_midx_checksum(bitmap_git->midx), bitmap_git->checksum))
-		goto cleanup;
+	}
 
 	if (load_midx_revindex(bitmap_git->midx) < 0) {
 		warning(_("multi-pack bitmap is missing required reverse index"));
@@ -377,40 +386,41 @@ cleanup:
 	bitmap_git->map_pos = 0;
 	bitmap_git->map = NULL;
 	bitmap_git->midx = NULL;
-	return -1;
+	return error("cannot open midx bitmap file");
 }
 
 static int open_pack_bitmap_1(struct bitmap_index *bitmap_git, struct packed_git *packfile)
 {
 	int fd;
 	struct stat st;
-	char *idx_name;
+	char *bitmap_name;
 
 	if (open_pack_index(packfile))
 		return -1;
 
-	idx_name = pack_bitmap_filename(packfile);
-	fd = git_open(idx_name);
-	free(idx_name);
+	bitmap_name = pack_bitmap_filename(packfile);
+	trace2_data_string("bitmap", the_repository, "path", bitmap_name);
+	fd = git_open(bitmap_name);
+	free(bitmap_name);
 
 	if (fd < 0)
 		return -1;
 
 	if (fstat(fd, &st)) {
 		close(fd);
-		return -1;
+		return error(_("cannot stat bitmap file"));
 	}
 
 	if (bitmap_git->pack || bitmap_git->midx) {
 		/* ignore extra bitmap file; we can only handle one */
-		warning("ignoring extra bitmap file: %s", packfile->pack_name);
+		warning(_("ignoring extra bitmap file: %s"), packfile->pack_name);
 		close(fd);
 		return -1;
 	}
 
 	if (!is_pack_valid(packfile)) {
 		close(fd);
-		return -1;
+		return error(_("packfile is invalid"));
 	}
 
 	bitmap_git->pack = packfile;
@@ -425,7 +435,7 @@ static int open_pack_bitmap_1(struct bitmap_index *bitmap_git, struct packed_git
 		bitmap_git->map_size = 0;
 		bitmap_git->map_pos = 0;
 		bitmap_git->pack = NULL;
-		return -1;
+		return error(_("bitmap header is invalid"));
 	}
 
 	return 0;
@@ -508,25 +518,31 @@ static int open_pack_bitmap(struct repository *r,
 static int open_midx_bitmap(struct repository *r,
 			    struct bitmap_index *bitmap_git)
 {
+	int ret = -1;
 	struct multi_pack_index *midx;
 
 	assert(!bitmap_git->map);
 
 	for (midx = get_multi_pack_index(r); midx; midx = midx->next) {
 		if (!open_midx_bitmap_1(bitmap_git, midx))
-			return 0;
+			ret = 0;
 	}
-	return -1;
+	return ret;
 }
 
 static int open_bitmap(struct repository *r,
 		       struct bitmap_index *bitmap_git)
 {
-	assert(!bitmap_git->map);
+	int ret = 0;
 
+	assert(!bitmap_git->map);
+	trace2_region_enter("pack-bitmap", "open_bitmap", r);
 	if (!open_midx_bitmap(r, bitmap_git))
-		return 0;
-	return open_pack_bitmap(r, bitmap_git);
+		goto done;
+	ret = open_pack_bitmap(r, bitmap_git);
+done:
+	trace2_region_leave("pack-bitmap", "open_bitmap", r);
+	return ret;
 }
 
 struct bitmap_index *prepare_bitmap_git(struct repository *r)

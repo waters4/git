@@ -9,6 +9,7 @@ static void repo_cfg_bool(struct repository *r, const char *key, int *dest,
 {
 	if (repo_config_get_bool(r, key, dest))
 		*dest = def;
+	trace2_data_string("config", r, key, *dest ? "true" : "false");
 }
 
 void prepare_repo_settings(struct repository *r)
