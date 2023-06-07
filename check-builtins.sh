@@ -11,9 +11,9 @@ make -f - sayIt 2>/dev/null |
 sed -n -e 's/.*XXX \(.*\) YYY.*/\1/p' |
 sort |
 {
-    bad=0
-    while read builtin
-    do
+	bad=0
+	while read builtin
+	do
 	base=$(expr "$builtin" : 'git-\(.*\)')
 	x=$(sed -ne 's/.*{ "'$base'", \(cmd_[^, ]*\).*/'$base'	\1/p' git.c)
 	if test -z "$x"
@@ -29,6 +29,6 @@ sort |
 			bad=1
 		fi
 	done
-    done
-    exit $bad
+	done
+	exit $bad
 }
